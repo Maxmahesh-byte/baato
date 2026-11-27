@@ -20,25 +20,34 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
+      <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">
         <Link to="/" className="flex items-baseline gap-2">
           <span className="font-display text-2xl tracking-[0.14em] text-fg">BAATO</span>
           <span className="hidden text-xs uppercase tracking-[0.2em] text-muted sm:inline">Parts</span>
         </Link>
-        <nav className="ml-4 hidden items-center gap-5 text-sm text-muted md:flex">
+        <nav className="ml-2 hidden max-w-full flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted lg:flex">
           <Link to="/parts" search={{}} className="hover:text-fg" activeProps={{ className: "text-fg" }}>
             Catalog
           </Link>
-          {categories.slice(0, 3).map((c) => (
+          {categories.map((c) => (
             <Link key={c.slug} to="/category/$slug" params={{ slug: c.slug }} className="hover:text-fg">
-              {c.name.split(" ")[0]}
+              {c.slug === "chains" ? "Chains" : c.slug === "brakes" ? "Brakes" : c.slug === "filters" ? "Filters" : "Electrical"}
             </Link>
           ))}
+          <Link to="/about" className="hover:text-fg">
+            About
+          </Link>
+          <Link to="/contact" className="hover:text-fg">
+            Contact
+          </Link>
+          <Link to="/orders/lookup" search={{ result: undefined }} className="hover:text-fg">
+            Orders
+          </Link>
           <Link to="/faq" className="hover:text-fg">
             FAQ
           </Link>
         </nav>
-        <form onSubmit={submit} className="ml-auto hidden min-w-0 flex-1 max-w-xs md:block">
+        <form onSubmit={submit} className="ml-auto hidden min-w-0 w-40 flex-1 xl:w-auto xl:max-w-xs lg:block">
           <label className="relative block">
             <span className="sr-only">Search parts</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
@@ -60,7 +69,7 @@ export function SiteHeader() {
         </Link>
         <button
           type="button"
-          className="inline-flex size-11 items-center justify-center rounded-full border border-line md:hidden"
+          className="inline-flex size-11 items-center justify-center rounded-full border border-line lg:hidden"
           aria-expanded={open}
           aria-label={open ? "Close menu" : "Open menu"}
           onClick={() => setOpen((v) => !v)}
@@ -69,7 +78,7 @@ export function SiteHeader() {
         </button>
       </div>
       {open && (
-        <div className="border-t border-line bg-bg px-4 py-4 md:hidden">
+        <div className="border-t border-line bg-bg px-4 py-4 lg:hidden">
           <form onSubmit={submit} className="mb-4">
             <input
               value={q}
@@ -95,6 +104,9 @@ export function SiteHeader() {
             </Link>
             <Link to="/contact" onClick={() => setOpen(false)} className="py-2">
               Contact
+            </Link>
+            <Link to="/orders/lookup" search={{ result: undefined }} onClick={() => setOpen(false)} className="py-2">
+              Order lookup
             </Link>
           </div>
         </div>
@@ -126,6 +138,9 @@ export function SiteFooter() {
           </Link>
           <Link to="/contact" className="hover:text-copper">
             Talk to the desk
+          </Link>
+          <Link to="/orders/lookup" search={{ result: undefined }} className="hover:text-copper">
+            Find an order
           </Link>
           <Link to="/parts" search={{}} className="hover:text-copper">
             All parts

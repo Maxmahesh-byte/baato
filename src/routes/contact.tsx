@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { submitInquiry } from "@/lib/orders.functions";
 import { abs, SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/contact")({
@@ -19,6 +20,8 @@ export const Route = createFileRoute("/contact")({
 
 function Contact() {
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   return (
     <main className="mx-auto max-w-3xl px-4 py-12">
       <p className="text-xs uppercase tracking-[0.18em] text-copper">Desk</p>
@@ -28,14 +31,30 @@ function Contact() {
       </p>
       {sent ? (
         <p className="mt-8 rounded-2xl border border-line bg-surface p-6">
-          Noted. On a live desk this would land with a parts lead. For now it stays on this device — call if the bike is already apart.
+          The desk has the note. If the bike is already apart, call as well.
         </p>
       ) : (
         <form
           className="mt-8 grid gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            setSent(true);
+            const form = new FormData(e.currentTarget);
+            setBusy(true);
+            setError("");
+            void submitInquiry({
+              data: {
+                name: String(form.get("name") ?? ""),
+                phone: String(form.get("phone") ?? ""),
+                note: String(form.get("note") ?? ""),
+              },
+            }).then((result) => {
+              setBusy(false);
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              setSent(true);
+            });
           }}
         >
           <label className="grid gap-1 text-sm">
@@ -50,8 +69,9 @@ function Contact() {
             Vehicle and the part you need
             <textarea required name="note" rows={5} className="rounded-xl border border-line bg-surface px-3 py-3" />
           </label>
-          <button type="submit" className="h-12 rounded-full bg-copper text-sm font-medium text-bg">
-            Send to the desk
+          {error ? <p className="text-sm text-copper">{error}</p> : null}
+          <button type="submit" disabled={busy} className="h-12 rounded-full bg-copper text-sm font-medium text-bg disabled:opacity-60">
+            {busy ? "Sending…" : "Send to the desk"}
           </button>
         </form>
       )}

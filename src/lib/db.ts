@@ -46,6 +46,7 @@ export interface Sql {
  */
 const globalRef = globalThis as typeof globalThis & {
   __pgSqlPromise__?: Promise<Sql>;
+  __pgPool__?: import("pg").Pool;
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
 };
@@ -94,6 +95,7 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
     const pool = new Pool({ connectionString: databaseUrl });
+    globalRef.__pgPool__ = pool;
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
@@ -177,6 +179,53 @@ async function createSql(): Promise<Sql> {
     );
   }
   return dbSource === "neon" ? createNeonSql() : createPgliteSql();
+}
+
+/**
+ * Run `fn` inside a single Postgres transaction (Neon pool client, or PGLite).
+ * Use this for order capture and invoice numbering so a crash cannot mark an
+ * order paid without its invoice, or the reverse. The callback must use the
+ * `sql` argument it is given — not `getSql()` — or it will run outside the
+ * transaction.
+ */
+export async function withTransaction<T>(fn: (sql: Sql) => Promise<T>): Promise<T> {
+  if (typeof window !== "undefined") {
+    throw new Error("withTransaction is server-only");
+  }
+  await getSql();
+  if (dbSource === "neon") {
+    const pool = globalRef.__pgPool__;
+    if (!pool) throw new Error("Postgres pool is not ready");
+    const client = await pool.connect();
+    const sql = toSql(async <TRow>(text: string, params: unknown[]) => {
+      const res = await client.query(text, params);
+      return res.rows as TRow[];
+    });
+    try {
+      await client.query("BEGIN");
+      const result = await fn(sql);
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // The connection may already be dead. Keep the original error.
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+  const pg = await globalRef.__pgliteInstance__;
+  if (!pg) throw new Error("PGLite is not ready");
+  return pg.transaction(async (tx) => {
+    const sql = toSql(async <TRow>(text: string, params: unknown[]) => {
+      const result = await tx.query<TRow>(text, params);
+      return result.rows;
+    });
+    return fn(sql);
+  });
 }
 
 /**

@@ -2,16 +2,19 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { JsonLd } from "@/components/json-ld";
 import { PartCard } from "@/components/part-card";
 import { partBySlug, parts, vehicleName } from "@/lib/catalog";
+import { fitmentMessage, whatsappHref } from "@/lib/checkout";
 import { useCart } from "@/lib/cart";
+import { getShopConfig } from "@/lib/orders.functions";
 import { abs, SITE } from "@/lib/site";
 import { npr } from "@/lib/utils";
 import { useState } from "react";
 
 export const Route = createFileRoute("/parts/$slug")({
-  loader: ({ params }) => {
+  loader: async ({ params }) => {
     const part = partBySlug(params.slug);
     if (!part) throw notFound();
-    return { part };
+    const config = await getShopConfig();
+    return { part, config };
   },
   head: ({ loaderData }) => {
     const part = loaderData?.part;
@@ -37,8 +40,9 @@ export const Route = createFileRoute("/parts/$slug")({
 });
 
 function Product() {
-  const { part } = Route.useLoaderData();
+  const { part, config } = Route.useLoaderData();
   const add = useCart((s) => s.add);
+  const inCart = useCart((s) => s.lines.find((line) => line.slug === part.slug)?.qty ?? 0);
   const [added, setAdded] = useState(false);
   const related = parts.filter((p) => p.slug !== part.slug && p.category === part.category).slice(0, 3);
 
@@ -103,16 +107,33 @@ function Product() {
           <p className="mt-1 text-sm text-muted">
             SKU {part.sku} · {part.stock} in the Valley cage · {part.eta}
           </p>
-          <button
-            type="button"
-            className="mt-6 h-12 rounded-full bg-copper px-8 text-sm font-medium text-bg"
-            onClick={() => {
-              add(part.slug, 1);
-              setAdded(true);
-            }}
-          >
-            {added ? "Added — add another" : "Add to dispatch list"}
-          </button>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <button
+              type="button"
+              disabled={part.stock <= 0 || inCart >= part.stock}
+              className="h-12 rounded-full bg-copper px-8 text-sm font-medium text-bg disabled:opacity-60"
+              onClick={() => {
+                add(part.slug, 1);
+                setAdded(true);
+              }}
+            >
+              {part.stock <= 0
+                ? "Out of stock"
+                : inCart >= part.stock
+                  ? "Cage limit reached"
+                  : added
+                    ? "Added — add another"
+                    : "Add to dispatch list"}
+            </button>
+            {config.whatsappE164 ? (
+              <a
+                href={whatsappHref(config.whatsappE164, fitmentMessage(part.name, part.sku))}
+                className="inline-flex h-12 items-center justify-center rounded-full border border-line px-5 text-sm"
+              >
+                Ask about fitment on WhatsApp
+              </a>
+            ) : null}
+          </div>
           <h2 className="mt-8 font-display text-2xl tracking-wide">Fits</h2>
           <ul className="mt-2 flex flex-wrap gap-2">
             {part.vehicles.map((v) => (

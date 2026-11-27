@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { JsonLd } from "@/components/json-ld";
 import { PartCard } from "@/components/part-card";
 import { categories, parts, vehicleName, vehicles } from "@/lib/catalog";
+import { catalogHeading, partHaystack } from "@/lib/checkout";
 import { abs } from "@/lib/site";
 
 type PartSearch = { q?: string; vehicle?: string; cat?: string };
@@ -28,22 +29,20 @@ export const Route = createFileRoute("/parts/")({
 
 function Catalog() {
   const { q, vehicle, cat } = Route.useSearch();
-  const query = (q ?? "").toLowerCase();
+  const query = (q ?? "").trim().toLowerCase();
+  const categoryName = cat ? categories.find((c) => c.slug === cat)?.name : undefined;
   const list = parts.filter((p) => {
     if (vehicle && !p.vehicles.includes(vehicle)) return false;
     if (cat && p.category !== cat) return false;
     if (!query) return true;
-    const blob = `${p.name} ${p.sku} ${p.lead} ${p.vehicles.map(vehicleName).join(" ")}`.toLowerCase();
-    return blob.includes(query);
+    return partHaystack(p).includes(query);
   });
 
-  const title = vehicle
-    ? `Parts for ${vehicleName(vehicle)}`
-    : cat
-      ? categories.find((c) => c.slug === cat)?.name ?? "Catalog"
-      : q
-        ? `Search: ${q}`
-        : "Full catalog";
+  const title = catalogHeading({
+    query: q,
+    vehicleName: vehicle ? vehicleName(vehicle) : undefined,
+    categoryName,
+  });
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
@@ -68,7 +67,7 @@ function Catalog() {
       <div className="mt-6 flex flex-wrap gap-2">
         <Link
           to="/parts"
-          search={{ q, vehicle: undefined, cat: undefined }}
+          search={{ q, vehicle: undefined, cat }}
           className={`rounded-full border px-3 py-2 text-sm ${!vehicle ? "border-copper text-copper" : "border-line text-muted"}`}
         >
           All vehicles
@@ -81,6 +80,25 @@ function Catalog() {
             className={`rounded-full border px-3 py-2 text-sm ${vehicle === v.slug ? "border-copper text-copper" : "border-line text-muted"}`}
           >
             {v.name}
+          </Link>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          to="/parts"
+          search={{ q, vehicle, cat: undefined }}
+          className={`rounded-full border px-3 py-2 text-sm ${!cat ? "border-copper text-copper" : "border-line text-muted"}`}
+        >
+          All systems
+        </Link>
+        {categories.map((c) => (
+          <Link
+            key={c.slug}
+            to="/parts"
+            search={{ q, vehicle, cat: c.slug }}
+            className={`rounded-full border px-3 py-2 text-sm ${cat === c.slug ? "border-copper text-copper" : "border-line text-muted"}`}
+          >
+            {c.name}
           </Link>
         ))}
       </div>
