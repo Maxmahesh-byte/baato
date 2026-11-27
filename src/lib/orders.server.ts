@@ -2,18 +2,25 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 import type { Sql } from "./db";
 import { getSql, withTransaction } from "./db";
+import type { TaggedSql } from "./sql-tag";
 import {
   normalizeNepalPhone,
   parseCheckoutInput,
   parseInquiry,
-  pricedFromCatalog,
   quoteLines,
   type OrderLine,
   type PaymentMethod,
 } from "./checkout";
+import { fulfillmentForOrderStatus, isFulfillment, type Fulfillment } from "./fulfillment";
+import { quoteAndReserve, StockError } from "./inventory";
 import { buildInvoiceView, type InvoiceView } from "./invoice-view";
 import { renderInvoicePdf } from "./invoice-pdf.server";
-import { formatFiscalInvoiceNumber, formatOrderCode, nepalFiscalYear, paisaToDecimal } from "./money";
+import {
+  formatFiscalInvoiceNumber,
+  formatOrderCode,
+  nepalFiscalYear,
+  paisaToDecimal,
+} from "./money";
 import type { OrderLookupResult, PlaceOrderResult, PublicOrder } from "./order-types";
 import { decideCapture } from "./payments/capture";
 import { buildEsewaForm } from "./payments/esewa";
@@ -36,6 +43,7 @@ const NOT_FOUND = "Order not found. Check the code and the mobile number used at
 type OrderRow = {
   id: string;
   code: string;
+  fulfillment: string | null;
   status: PublicOrder["status"];
   payment_method: PaymentMethod;
   payment_status: PublicOrder["paymentStatus"];
@@ -96,7 +104,8 @@ type RawPayment = {
   websocketUrl?: string | null;
 };
 
-export type OrderPageData = { needsPhone: true; code: string } | { needsPhone: false; order: PublicOrder };
+export type OrderPageData =
+  { needsPhone: true; code: string } | { needsPhone: false; order: PublicOrder };
 
 function suffix(length = 8): string {
   return randomBytes(8).toString("hex").slice(0, length);
@@ -142,7 +151,13 @@ function requestOrigin(): string {
 
 function rememberCustomer(phone: string, code: string) {
   const secure = requestOrigin().startsWith("https://");
-  const options = { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" as const, httpOnly: true, secure };
+  const options = {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+    sameSite: "lax" as const,
+    httpOnly: true,
+    secure,
+  };
   setCookie(PHONE_COOKIE, phone, options);
   setCookie(ORDER_COOKIE, code, options);
 }
@@ -156,22 +171,35 @@ function phonesMatch(stored: string, given: string): boolean {
 
 async function qrSvg(message: string): Promise<string | null> {
   const QRCode = await import("qrcode");
-  const svg = await QRCode.toString(message, { type: "svg", margin: 1, width: 280, errorCorrectionLevel: "M" });
+  const svg = await QRCode.toString(message, {
+    type: "svg",
+    margin: 1,
+    width: 280,
+    errorCorrectionLevel: "M",
+  });
   if (!svg.trimStart().startsWith("<svg")) return null;
   return svg;
 }
 
 async function toPublic(sql: Sql, order: OrderRow): Promise<PublicOrder> {
   const invoices = await sql<InvoiceRow>`select * from invoices where order_id = ${order.id}`;
-  const invoice = invoices.find((row) => row.kind === "tax") ?? invoices.find((row) => row.kind === "proforma") ?? null;
+  const invoice =
+    invoices.find((row) => row.kind === "tax") ??
+    invoices.find((row) => row.kind === "proforma") ??
+    null;
   const payments = await sql<PaymentRow>`
     select * from payments where order_id = ${order.id} order by created_at desc limit 1
   `;
   const raw = payments[0] ? asRaw(payments[0].raw) : {};
   const qr = raw.qrMessage ? await qrSvg(raw.qrMessage) : null;
-  const socket = raw.websocketUrl && raw.websocketUrl.startsWith("wss://") ? raw.websocketUrl : null;
+  const socket =
+    raw.websocketUrl && raw.websocketUrl.startsWith("wss://") ? raw.websocketUrl : null;
+  const fulfillment: Fulfillment = isFulfillment(order.fulfillment)
+    ? order.fulfillment
+    : fulfillmentForOrderStatus(order.status);
   return {
     code: order.code,
+    fulfillment,
     status: order.status,
     paymentMethod: order.payment_method,
     paymentStatus: order.payment_status,
@@ -236,10 +264,11 @@ async function insertOrder(
 ) {
   await sql`
     insert into orders (
-      id, code, status, payment_method, payment_status, customer_name, phone, address, zone, buyer_pan,
+      id, code, status, fulfillment, payment_method, payment_status, customer_name, phone, address, zone, buyer_pan,
       subtotal_paisa, shipping_paisa, taxable_paisa, vat_paisa, total_paisa, lines
     ) values (
-      ${input.id}, ${input.code}, ${input.status}, ${input.paymentMethod}, ${input.paymentStatus},
+      ${input.id}, ${input.code}, ${input.status}, ${fulfillmentForOrderStatus(input.status)},
+      ${input.paymentMethod}, ${input.paymentStatus},
       ${input.name}, ${input.phone}, ${input.address}, ${input.zone}, ${input.pan},
       ${input.quote.subtotalPaisa}, ${input.quote.shippingPaisa}, ${input.quote.taxablePaisa},
       ${input.quote.vatPaisa}, ${input.quote.totalPaisa}, ${JSON.stringify(input.quote.lines)}::jsonb
@@ -247,12 +276,9 @@ async function insertOrder(
   `;
 }
 
-async function issueInvoice(
-  sql: Sql,
-  order: OrderRow,
-  kind: "proforma" | "tax",
-): Promise<void> {
-  const existing = await sql`select id from invoices where order_id = ${order.id} and kind = ${kind}`;
+async function issueInvoice(sql: Sql, order: OrderRow, kind: "proforma" | "tax"): Promise<void> {
+  const existing =
+    await sql`select id from invoices where order_id = ${order.id} and kind = ${kind}`;
   if (existing[0]) return;
   const fiscalYear = nepalFiscalYear(new Date());
   let invoiceNumber = `PF-${order.code}`;
@@ -297,41 +323,51 @@ export async function placeOrderRecord(input: unknown): Promise<PlaceOrderResult
   if (!parsed.ok) return parsed;
   const value = parsed.value;
   if (!methodEnabled(value.method)) {
-    return { ok: false, error: "That payment method is not switched on yet. Cash on delivery is available." };
+    return {
+      ok: false,
+      error: "That payment method is not switched on yet. Cash on delivery is available.",
+    };
   }
-  const quote = quoteLines(value.lines, pricedFromCatalog, value.zone);
-  if (!quote.ok) return quote;
-  if (value.method === "khalti" && quote.totalPaisa < KHALTI_MIN_PAISA) {
-    return { ok: false, error: "Khalti requires a total of at least NPR 10." };
-  }
-
   const id = randomUUID();
   const isCod = value.method === "cod";
-  const code = await withTransaction(async (sql) => {
-    const next = await nextOrderCode(sql);
-    await insertOrder(sql, {
-      id,
-      code: next,
-      status: isCod ? "cod_confirmed" : "pending_payment",
-      paymentMethod: value.method,
-      paymentStatus: isCod ? "unpaid" : "pending",
-      name: value.name,
-      phone: value.phone,
-      address: value.address,
-      zone: value.zone,
-      pan: value.pan,
-      quote,
+  let code: string;
+  let quote: Extract<ReturnType<typeof quoteLines>, { ok: true }>;
+  try {
+    const placed = await withTransaction(async (sql) => {
+      const reserved = await quoteAndReserve(sql, value.lines, value.zone);
+      if (value.method === "khalti" && reserved.totalPaisa < KHALTI_MIN_PAISA) {
+        throw new StockError("Khalti requires a total of at least NPR 10.");
+      }
+      const next = await nextOrderCode(sql);
+      await insertOrder(sql, {
+        id,
+        code: next,
+        status: isCod ? "cod_confirmed" : "pending_payment",
+        paymentMethod: value.method,
+        paymentStatus: isCod ? "unpaid" : "pending",
+        name: value.name,
+        phone: value.phone,
+        address: value.address,
+        zone: value.zone,
+        pan: value.pan,
+        quote: reserved,
+      });
+      if (isCod) {
+        const row = await sql<OrderRow>`select * from orders where id = ${id}`;
+        await sql`
+          insert into payments (id, order_id, provider, provider_ref, amount_paisa, status)
+          values (${randomUUID()}, ${id}, 'cod', ${next}, ${reserved.totalPaisa}, 'initiated')
+        `;
+        if (row[0]) await issueInvoice(sql, row[0], "proforma");
+      }
+      return { code: next, quote: reserved };
     });
-    if (isCod) {
-      const row = await sql<OrderRow>`select * from orders where id = ${id}`;
-      await sql`
-        insert into payments (id, order_id, provider, provider_ref, amount_paisa, status)
-        values (${randomUUID()}, ${id}, 'cod', ${next}, ${quote.totalPaisa}, 'initiated')
-      `;
-      if (row[0]) await issueInvoice(sql, row[0], "proforma");
-    }
-    return next;
-  });
+    code = placed.code;
+    quote = placed.quote;
+  } catch (err) {
+    if (err instanceof StockError) return { ok: false, error: err.message };
+    throw err;
+  }
 
   rememberCustomer(value.phone, code);
 
@@ -351,7 +387,10 @@ export async function placeOrderRecord(input: unknown): Promise<PlaceOrderResult
     return {
       ok: true,
       order,
-      warning: err instanceof Error ? err.message : "The payment could not start. You can try again from the order page.",
+      warning:
+        err instanceof Error
+          ? err.message
+          : "The payment could not start. You can try again from the order page.",
     };
   }
 
@@ -442,7 +481,10 @@ export async function loadOrderPage(code: string): Promise<OrderPageData> {
   return { needsPhone: false, order };
 }
 
-export async function lookupOrderRecord(code: string, phoneInput: string): Promise<OrderLookupResult> {
+export async function lookupOrderRecord(
+  code: string,
+  phoneInput: string,
+): Promise<OrderLookupResult> {
   const phone = normalizeNepalPhone(phoneInput);
   if (!phone) return { ok: false, error: "Enter the Nepal mobile number used at checkout." };
   const order = await publicIfMatch(code.trim(), phone);
@@ -451,7 +493,10 @@ export async function lookupOrderRecord(code: string, phoneInput: string): Promi
   return { ok: true, order };
 }
 
-export async function refreshOrderRecord(code: string, phoneInput: string): Promise<OrderLookupResult> {
+export async function refreshOrderRecord(
+  code: string,
+  phoneInput: string,
+): Promise<OrderLookupResult> {
   const found = await lookupOrderRecord(code, phoneInput);
   if (!found.ok) return found;
   if (found.order.status !== "pending_payment") return found;
@@ -473,7 +518,10 @@ export async function refreshOrderRecord(code: string, phoneInput: string): Prom
   return { ok: true, order: fresh };
 }
 
-export async function resumeOrderPayment(code: string, phoneInput: string): Promise<OrderLookupResult> {
+export async function resumeOrderPayment(
+  code: string,
+  phoneInput: string,
+): Promise<OrderLookupResult> {
   const found = await lookupOrderRecord(code, phoneInput);
   if (!found.ok) return found;
   if (found.order.status !== "pending_payment") return found;
@@ -506,7 +554,10 @@ export async function resumeOrderPayment(code: string, phoneInput: string): Prom
       }
       if (order.payment_method === "fonepay") await startFonepay(order.id, order.code, quote);
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : "The payment could not be restarted." };
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "The payment could not be restarted.",
+      };
     }
   }
   const fresh = await publicIfMatch(order.code, order.phone);
@@ -568,7 +619,7 @@ export async function verifyProviderRef(
   if (decision.action === "wait") return { location: `/orders/${order.code}?result=pending` };
   if (decision.action === "reject") {
     await sql`
-      update payments set status = 'failed', raw = ${JSON.stringify({ ...(asRaw(payment.raw)), verify: check.raw })}::jsonb
+      update payments set status = 'failed', raw = ${JSON.stringify({ ...asRaw(payment.raw), verify: check.raw })}::jsonb
       where id = ${payment.id} and status <> 'captured'
     `;
     return { location: `/orders/${order.code}?result=failed` };
@@ -592,7 +643,7 @@ export async function verifyProviderRef(
       insert into payments (id, order_id, provider, provider_ref, amount_paisa, status, raw)
       values (
         ${payment.id}, ${current.id}, ${provider}, ${providerRef}, ${check.amountPaisa}, 'captured',
-        ${JSON.stringify({ ...(asRaw(payment.raw)), verify: check.raw })}::jsonb
+        ${JSON.stringify({ ...asRaw(payment.raw), verify: check.raw })}::jsonb
       )
       on conflict (provider, provider_ref) do update
       set status = 'captured', amount_paisa = excluded.amount_paisa, raw = excluded.raw
@@ -601,9 +652,15 @@ export async function verifyProviderRef(
     const owner = await tx<{ order_id: string }>`
       select order_id from payments where provider = ${provider} and provider_ref = ${providerRef}
     `;
-    if (owner[0]?.order_id !== current.id) throw new Error("Payment reference belongs to another order");
+    if (owner[0]?.order_id !== current.id)
+      throw new Error("Payment reference belongs to another order");
     await tx`
-      update orders set status = 'paid', payment_status = 'paid', paid_at = now()
+      update orders
+      set status = 'paid', payment_status = 'paid', paid_at = now(),
+          fulfillment = case
+            when fulfillment in ('pending', 'confirmed') then 'paid'
+            else fulfillment
+          end
       where id = ${current.id} and status = 'pending_payment'
     `;
     const paid = await tx<OrderRow>`select * from orders where id = ${current.id}`;
@@ -617,6 +674,29 @@ export function orderCodeFromCookie(): string | undefined {
   return getCookie(ORDER_COOKIE);
 }
 
+export async function settleCodPayment(sql: TaggedSql, orderId: string): Promise<void> {
+  await sql`
+    update orders
+    set status = 'paid', payment_status = 'paid', fulfillment = 'paid', paid_at = coalesce(paid_at, now())
+    where id = ${orderId} and payment_method = 'cod' and status = 'cod_confirmed'
+  `;
+  await sql`
+    update payments set status = 'captured'
+    where order_id = ${orderId} and provider = 'cod' and status = 'initiated'
+  `;
+  const paid = await sql<OrderRow>`select * from orders where id = ${orderId}`;
+  if (paid[0]?.status === "paid") await issueInvoice(sql as Sql, paid[0], "tax");
+}
+
+export async function invoicePdfForCode(
+  code: string,
+): Promise<{ ok: true; filename: string; base64: string } | { ok: false; error: string }> {
+  const sql = await getSql();
+  const order = await orderByCode(sql, code.trim());
+  if (!order) return { ok: false, error: NOT_FOUND };
+  return renderStoredInvoice(sql, order);
+}
+
 export async function invoicePdfRecord(
   code: string,
   phoneInput: string,
@@ -626,8 +706,16 @@ export async function invoicePdfRecord(
   const sql = await getSql();
   const order = await orderByCode(sql, found.order.code);
   if (!order) return { ok: false, error: NOT_FOUND };
+  return renderStoredInvoice(sql, order);
+}
+
+async function renderStoredInvoice(
+  sql: Sql,
+  order: OrderRow,
+): Promise<{ ok: true; filename: string; base64: string } | { ok: false; error: string }> {
   const invoices = await sql<InvoiceRow>`select * from invoices where order_id = ${order.id}`;
-  const invoice = invoices.find((row) => row.kind === "tax") ?? invoices.find((row) => row.kind === "proforma");
+  const invoice =
+    invoices.find((row) => row.kind === "tax") ?? invoices.find((row) => row.kind === "proforma");
   if (!invoice) return { ok: false, error: "The bill is not ready yet." };
   const seller = sellerFromEnv();
   const view: InvoiceView = buildInvoiceView({
@@ -662,7 +750,9 @@ export async function invoicePdfRecord(
   };
 }
 
-export async function saveInquiry(input: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function saveInquiry(
+  input: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const parsed = parseInquiry(input);
   if (!parsed.ok) return parsed;
   const sql = await getSql();

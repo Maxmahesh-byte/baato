@@ -4,7 +4,7 @@ export const SITE = {
   url: "https://baato.parts",
   tagline: "Correct part. Same day. Back on the road.",
   description:
-    "BAATO is Nepal’s vehicle-parts desk for motorcycles and cars. Exact fitment, road-tested stock, and same-day delivery across Kathmandu Valley.",
+    "BAATO is Nepal’s vehicle-parts desk for motorcycles and cars. Exact fitment for Pulsar, Apache, FZ, Classic 350, Scorpio, Swift, Creta, and Hilux, with same-day delivery across Kathmandu Valley.",
   phone: "+977-1-5900000",
   email: "desk@baato.parts",
   city: "Kathmandu",

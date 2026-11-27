@@ -3,6 +3,9 @@ import { JsonLd } from "@/components/json-ld";
 import { PartCard } from "@/components/part-card";
 import { categories, parts, vehicleName, vehicles } from "@/lib/catalog";
 import { catalogHeading, partHaystack } from "@/lib/checkout";
+import { withSellableStock } from "@/lib/inventory";
+import { getPublicStock } from "@/lib/orders.functions";
+import { breadcrumbNode } from "@/lib/seo";
 import { abs } from "@/lib/site";
 
 type PartSearch = { q?: string; vehicle?: string; cat?: string };
@@ -13,6 +16,7 @@ export const Route = createFileRoute("/parts/")({
     vehicle: typeof search.vehicle === "string" && search.vehicle ? search.vehicle : undefined,
     cat: typeof search.cat === "string" && search.cat ? search.cat : undefined,
   }),
+  loader: async () => ({ stock: await getPublicStock() }),
   head: () => ({
     meta: [
       { title: "Vehicle parts catalog — BAATO Nepal" },
@@ -21,6 +25,7 @@ export const Route = createFileRoute("/parts/")({
         content:
           "Browse in-stock motorcycle and car parts for Nepal: chains, brakes, filters, and batteries with exact model fitment and NPR prices.",
       },
+      { name: "robots", content: "index,follow" },
     ],
     links: [{ rel: "canonical", href: abs("/parts") }],
   }),
@@ -29,9 +34,11 @@ export const Route = createFileRoute("/parts/")({
 
 function Catalog() {
   const { q, vehicle, cat } = Route.useSearch();
+  const { stock } = Route.useLoaderData();
   const query = (q ?? "").trim().toLowerCase();
   const categoryName = cat ? categories.find((c) => c.slug === cat)?.name : undefined;
-  const list = parts.filter((p) => {
+  const priced = parts.map((part) => withSellableStock(part, stock[part.slug]));
+  const list = priced.filter((p) => {
     if (vehicle && !p.vehicles.includes(vehicle)) return false;
     if (cat && p.category !== cat) return false;
     if (!query) return true;
@@ -49,22 +56,38 @@ function Catalog() {
       <JsonLd
         data={{
           "@context": "https://schema.org",
-          "@type": "ItemList",
-          name: title,
-          itemListElement: list.map((p, i) => ({
-            "@type": "ListItem",
-            position: i + 1,
-            url: abs(`/parts/${p.slug}`),
-            name: p.name,
-          })),
+          "@graph": [
+            breadcrumbNode([
+              { name: "Home", path: "/" },
+              { name: "Catalog", path: "/parts" },
+            ]),
+            {
+              "@type": "ItemList",
+              name: title,
+              itemListElement: list.map((p, i) => ({
+                "@type": "ListItem",
+                position: i + 1,
+                url: abs(`/parts/${p.slug}`),
+                name: p.name,
+              })),
+            },
+          ],
         }}
       />
-      <p className="text-xs uppercase tracking-[0.18em] text-copper">Catalog</p>
+      <nav className="text-sm text-muted">
+        <Link to="/" className="hover:text-fg">
+          Home
+        </Link>
+        <span className="px-2">/</span>
+        <span className="text-fg">Catalog</span>
+      </nav>
+      <p className="mt-6 text-xs uppercase tracking-[0.18em] text-copper">Catalog</p>
       <h1 className="mt-2 font-display text-5xl tracking-wide">{title}</h1>
       <p className="mt-3 max-w-2xl text-sm text-muted">
-        {list.length} parts. Filter by the vehicle you actually own — badges are not enough when engines changed mid-generation.
+        {list.length} parts. Filter by the vehicle you actually own — badges are not enough when
+        engines changed mid-generation.
       </p>
-      <div className="mt-6 flex flex-wrap gap-2">
+      <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
         <Link
           to="/parts"
           search={{ q, vehicle: undefined, cat }}
@@ -77,7 +100,7 @@ function Catalog() {
             key={v.slug}
             to="/parts"
             search={{ q, cat, vehicle: v.slug }}
-            className={`rounded-full border px-3 py-2 text-sm ${vehicle === v.slug ? "border-copper text-copper" : "border-line text-muted"}`}
+            className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-2 text-sm ${vehicle === v.slug ? "border-copper text-copper" : "border-line text-muted"}`}
           >
             {v.name}
           </Link>
@@ -103,7 +126,9 @@ function Catalog() {
         ))}
       </div>
       {list.length === 0 ? (
-        <p className="mt-10 text-muted">Nothing matches. Try the model name or clear the vehicle filter.</p>
+        <p className="mt-10 text-muted">
+          Nothing matches. Try the model name or clear the vehicle filter.
+        </p>
       ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((p) => (
