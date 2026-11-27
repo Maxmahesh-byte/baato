@@ -4,5 +4,6 @@ screenshots/
 artifacts/
 .env
 .env.*
+!.env.example
 *.log
 .grok/

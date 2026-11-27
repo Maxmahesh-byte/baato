@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { capQty } from "./checkout";
+import { partBySlug } from "./catalog";
 
 export type CartLine = { slug: string; qty: number };
 
@@ -17,23 +19,29 @@ export const useCart = create<CartState>()(
       lines: [],
       add: (slug, qty = 1) =>
         set((s) => {
+          const stock = partBySlug(slug)?.stock ?? 0;
+          const adding = capQty(qty, stock);
+          if (adding <= 0) return s;
           const hit = s.lines.find((l) => l.slug === slug);
           if (hit) {
             return {
               lines: s.lines.map((l) =>
-                l.slug === slug ? { ...l, qty: Math.min(99, l.qty + qty) } : l,
+                l.slug === slug ? { ...l, qty: capQty(l.qty + qty, stock) } : l,
               ),
             };
           }
-          return { lines: [...s.lines, { slug, qty }] };
+          return { lines: [...s.lines, { slug, qty: adding }] };
         }),
       setQty: (slug, qty) =>
-        set((s) => ({
-          lines:
-            qty <= 0
-              ? s.lines.filter((l) => l.slug !== slug)
-              : s.lines.map((l) => (l.slug === slug ? { ...l, qty: Math.min(99, qty) } : l)),
-        })),
+        set((s) => {
+          const capped = capQty(qty, partBySlug(slug)?.stock ?? 0);
+          return {
+            lines:
+              capped <= 0
+                ? s.lines.filter((l) => l.slug !== slug)
+                : s.lines.map((l) => (l.slug === slug ? { ...l, qty: capped } : l)),
+          };
+        }),
       remove: (slug) => set((s) => ({ lines: s.lines.filter((l) => l.slug !== slug) })),
       clear: () => set({ lines: [] }),
     }),

@@ -21,7 +21,7 @@ const faqs = [
   },
   {
     q: "Do you take cash on delivery?",
-    a: "Yes inside the Valley, and on the corridors where our rider or partner collects. Prepaid eSewa, Khalti, and bank transfer are available everywhere. Card checkout is not the default because it is not how most garages pay.",
+    a: "Yes. Cash on delivery is the default inside Kathmandu Valley and is available outside the Valley too. Delivery is NPR 150 in the Valley (free from NPR 5,000) and NPR 350 outside (free from NPR 15,000). eSewa, Khalti, and Fonepay QR appear at checkout when those methods are switched on. COD gets a proforma bill immediately. A tax invoice number is issued when payment is confirmed.",
   },
   {
     q: "Can a garage open an account?",

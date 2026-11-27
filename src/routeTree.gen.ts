@@ -15,9 +15,14 @@ import { Route as CartRouteImport } from './routes/cart'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as CategorySlugRouteImport } from './routes/category/$slug'
+import { Route as OrdersCodeRouteImport } from './routes/orders/$code'
+import { Route as OrdersLookupRouteImport } from './routes/orders/lookup'
 import { Route as PartsIndexRouteImport } from './routes/parts/index'
 import { Route as PartsSlugRouteImport } from './routes/parts/$slug'
 import { Route as VehiclesSlugRouteImport } from './routes/vehicles/$slug'
+import { Route as ApiPaymentsEsewaRouteImport } from './routes/api/payments/esewa'
+import { Route as ApiPaymentsFonepayRouteImport } from './routes/api/payments/fonepay'
+import { Route as ApiPaymentsKhaltiRouteImport } from './routes/api/payments/khalti'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -49,6 +54,16 @@ const CategorySlugRoute = CategorySlugRouteImport.update({
   path: '/category/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrdersCodeRoute = OrdersCodeRouteImport.update({
+  id: '/orders/$code',
+  path: '/orders/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersLookupRoute = OrdersLookupRouteImport.update({
+  id: '/orders/lookup',
+  path: '/orders/lookup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PartsIndexRoute = PartsIndexRouteImport.update({
   id: '/parts/',
   path: '/parts/',
@@ -64,6 +79,21 @@ const VehiclesSlugRoute = VehiclesSlugRouteImport.update({
   path: '/vehicles/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPaymentsEsewaRoute = ApiPaymentsEsewaRouteImport.update({
+  id: '/api/payments/esewa',
+  path: '/api/payments/esewa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPaymentsFonepayRoute = ApiPaymentsFonepayRouteImport.update({
+  id: '/api/payments/fonepay',
+  path: '/api/payments/fonepay',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPaymentsKhaltiRoute = ApiPaymentsKhaltiRouteImport.update({
+  id: '/api/payments/khalti',
+  path: '/api/payments/khalti',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -72,9 +102,14 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/category/$slug': typeof CategorySlugRoute
+  '/orders/$code': typeof OrdersCodeRoute
+  '/orders/lookup': typeof OrdersLookupRoute
   '/parts/$slug': typeof PartsSlugRoute
   '/vehicles/$slug': typeof VehiclesSlugRoute
   '/parts/': typeof PartsIndexRoute
+  '/api/payments/esewa': typeof ApiPaymentsEsewaRoute
+  '/api/payments/fonepay': typeof ApiPaymentsFonepayRoute
+  '/api/payments/khalti': typeof ApiPaymentsKhaltiRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -83,9 +118,14 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/category/$slug': typeof CategorySlugRoute
+  '/orders/$code': typeof OrdersCodeRoute
+  '/orders/lookup': typeof OrdersLookupRoute
   '/parts/$slug': typeof PartsSlugRoute
   '/vehicles/$slug': typeof VehiclesSlugRoute
   '/parts': typeof PartsIndexRoute
+  '/api/payments/esewa': typeof ApiPaymentsEsewaRoute
+  '/api/payments/fonepay': typeof ApiPaymentsFonepayRoute
+  '/api/payments/khalti': typeof ApiPaymentsKhaltiRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -95,9 +135,14 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/category/$slug': typeof CategorySlugRoute
+  '/orders/$code': typeof OrdersCodeRoute
+  '/orders/lookup': typeof OrdersLookupRoute
   '/parts/$slug': typeof PartsSlugRoute
   '/vehicles/$slug': typeof VehiclesSlugRoute
   '/parts/': typeof PartsIndexRoute
+  '/api/payments/esewa': typeof ApiPaymentsEsewaRoute
+  '/api/payments/fonepay': typeof ApiPaymentsFonepayRoute
+  '/api/payments/khalti': typeof ApiPaymentsKhaltiRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -108,9 +153,14 @@ export interface FileRouteTypes {
     | '/contact'
     | '/faq'
     | '/category/$slug'
+    | '/orders/$code'
+    | '/orders/lookup'
     | '/parts/$slug'
     | '/vehicles/$slug'
     | '/parts/'
+    | '/api/payments/esewa'
+    | '/api/payments/fonepay'
+    | '/api/payments/khalti'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -119,9 +169,14 @@ export interface FileRouteTypes {
     | '/contact'
     | '/faq'
     | '/category/$slug'
+    | '/orders/$code'
+    | '/orders/lookup'
     | '/parts/$slug'
     | '/vehicles/$slug'
     | '/parts'
+    | '/api/payments/esewa'
+    | '/api/payments/fonepay'
+    | '/api/payments/khalti'
   id:
     | '__root__'
     | '/'
@@ -130,9 +185,14 @@ export interface FileRouteTypes {
     | '/contact'
     | '/faq'
     | '/category/$slug'
+    | '/orders/$code'
+    | '/orders/lookup'
     | '/parts/$slug'
     | '/vehicles/$slug'
     | '/parts/'
+    | '/api/payments/esewa'
+    | '/api/payments/fonepay'
+    | '/api/payments/khalti'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -142,9 +202,14 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   FaqRoute: typeof FaqRoute
   CategorySlugRoute: typeof CategorySlugRoute
+  OrdersCodeRoute: typeof OrdersCodeRoute
+  OrdersLookupRoute: typeof OrdersLookupRoute
   PartsSlugRoute: typeof PartsSlugRoute
   VehiclesSlugRoute: typeof VehiclesSlugRoute
   PartsIndexRoute: typeof PartsIndexRoute
+  ApiPaymentsEsewaRoute: typeof ApiPaymentsEsewaRoute
+  ApiPaymentsFonepayRoute: typeof ApiPaymentsFonepayRoute
+  ApiPaymentsKhaltiRoute: typeof ApiPaymentsKhaltiRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -191,6 +256,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CategorySlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/orders/$code': {
+      id: '/orders/$code'
+      path: '/orders/$code'
+      fullPath: '/orders/$code'
+      preLoaderRoute: typeof OrdersCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders/lookup': {
+      id: '/orders/lookup'
+      path: '/orders/lookup'
+      fullPath: '/orders/lookup'
+      preLoaderRoute: typeof OrdersLookupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/parts/': {
       id: '/parts/'
       path: '/parts'
@@ -212,6 +291,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VehiclesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/payments/esewa': {
+      id: '/api/payments/esewa'
+      path: '/api/payments/esewa'
+      fullPath: '/api/payments/esewa'
+      preLoaderRoute: typeof ApiPaymentsEsewaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/payments/fonepay': {
+      id: '/api/payments/fonepay'
+      path: '/api/payments/fonepay'
+      fullPath: '/api/payments/fonepay'
+      preLoaderRoute: typeof ApiPaymentsFonepayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/payments/khalti': {
+      id: '/api/payments/khalti'
+      path: '/api/payments/khalti'
+      fullPath: '/api/payments/khalti'
+      preLoaderRoute: typeof ApiPaymentsKhaltiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -222,9 +322,14 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   FaqRoute: FaqRoute,
   CategorySlugRoute: CategorySlugRoute,
+  OrdersCodeRoute: OrdersCodeRoute,
+  OrdersLookupRoute: OrdersLookupRoute,
   PartsSlugRoute: PartsSlugRoute,
   VehiclesSlugRoute: VehiclesSlugRoute,
   PartsIndexRoute: PartsIndexRoute,
+  ApiPaymentsEsewaRoute: ApiPaymentsEsewaRoute,
+  ApiPaymentsFonepayRoute: ApiPaymentsFonepayRoute,
+  ApiPaymentsKhaltiRoute: ApiPaymentsKhaltiRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
