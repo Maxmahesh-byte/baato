@@ -1,7 +1,9 @@
 import type { DeliveryZone, OrderLine, PaymentMethod } from "./checkout";
+import type { Fulfillment } from "./fulfillment";
 
 export type PublicOrder = {
   code: string;
+  fulfillment: Fulfillment;
   status: "pending_payment" | "cod_confirmed" | "paid" | "cancelled";
   paymentMethod: PaymentMethod;
   paymentStatus: "unpaid" | "pending" | "paid" | "failed";
@@ -26,7 +28,6 @@ export type PublicOrder = {
 };
 
 export type PlaceOrderResult =
-  | { ok: false; error: string }
-  | { ok: true; order: PublicOrder; warning?: string };
+  { ok: false; error: string } | { ok: true; order: PublicOrder; warning?: string };
 
 export type OrderLookupResult = { ok: true; order: PublicOrder } | { ok: false; error: string };

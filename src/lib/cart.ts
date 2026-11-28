@@ -7,8 +7,8 @@ export type CartLine = { slug: string; qty: number };
 
 type CartState = {
   lines: CartLine[];
-  add: (slug: string, qty?: number) => void;
-  setQty: (slug: string, qty: number) => void;
+  add: (slug: string, qty?: number, stock?: number) => void;
+  setQty: (slug: string, qty: number, stock?: number) => void;
   remove: (slug: string) => void;
   clear: () => void;
 };
@@ -17,24 +17,24 @@ export const useCart = create<CartState>()(
   persist(
     (set) => ({
       lines: [],
-      add: (slug, qty = 1) =>
+      add: (slug, qty = 1, stock) =>
         set((s) => {
-          const stock = partBySlug(slug)?.stock ?? 0;
-          const adding = capQty(qty, stock);
+          const available = stock ?? partBySlug(slug)?.stock ?? 0;
+          const adding = capQty(qty, available);
           if (adding <= 0) return s;
           const hit = s.lines.find((l) => l.slug === slug);
           if (hit) {
             return {
               lines: s.lines.map((l) =>
-                l.slug === slug ? { ...l, qty: capQty(l.qty + qty, stock) } : l,
+                l.slug === slug ? { ...l, qty: capQty(l.qty + qty, available) } : l,
               ),
             };
           }
           return { lines: [...s.lines, { slug, qty: adding }] };
         }),
-      setQty: (slug, qty) =>
+      setQty: (slug, qty, stock) =>
         set((s) => {
-          const capped = capQty(qty, partBySlug(slug)?.stock ?? 0);
+          const capped = capQty(qty, stock ?? partBySlug(slug)?.stock ?? 0);
           return {
             lines:
               capped <= 0

@@ -51,7 +51,14 @@ export const loadOrderPageFn = createServerFn({ method: "POST" })
     return loadOrderPage(data.code);
   });
 
-export const getShopConfig = createServerFn({ method: "GET" }).handler(async (): Promise<PublicShopConfig> => {
-  const { getPublicShopConfig } = await import("./shop.server");
-  return getPublicShopConfig();
+export const getShopConfig = createServerFn({ method: "GET" }).handler(
+  async (): Promise<PublicShopConfig> => {
+    const { getPublicShopConfig } = await import("./shop.server");
+    return getPublicShopConfig();
+  },
+);
+
+export const getPublicStock = createServerFn({ method: "GET" }).handler(async () => {
+  const { publicStock } = await import("./stock.server");
+  return publicStock();
 });

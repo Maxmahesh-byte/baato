@@ -25,8 +25,23 @@ Set these in the host environment. Names and purpose are listed in `.env.example
 - `KHALTI_SECRET_KEY`, `KHALTI_ENV`
 - `FONEPAY_MERCHANT_CODE`, `FONEPAY_USERNAME`, `FONEPAY_PASSWORD`, `FONEPAY_SECRET`, `FONEPAY_ENV`
 - `FONEPAY_WEBHOOK_SECRET` — only if something will `POST /api/payments/fonepay` with header `x-baato-webhook-secret`
+- `ADMIN_SECRET` (or `ADMIN_PASSWORD`) — password for `/admin`. Leave unset and the desk shows a setup notice instead of opening
 
 None of these use a `VITE_` prefix, so they are not shipped to the browser.
+
+## Admin desk
+
+`/admin` lists orders and the parts cage.
+
+1. Set `ADMIN_SECRET` to a long random string in the server environment. `ADMIN_PASSWORD` is accepted if `ADMIN_SECRET` is empty.
+2. Restart the server.
+3. Open `/admin` and sign in. The session is an HTTP-only cookie signed with that secret, for 12 hours.
+
+Without the secret, `/admin` explains how to set it and does not show orders or stock. The page is `noindex`, and `robots.txt` disallows `/admin` and `/api`.
+
+Order filters are pending, confirmed, paid, dispatched, delivered, and cancelled. Search matches an order code (`BT-1001`) or the mobile number from checkout. Cash-on-delivery orders can be marked paid from the desk, which issues the tax invoice. Wallet orders become paid only after the payment check.
+
+Stock saved on the desk is what checkout will sell. Turning a part off keeps the quantity and blocks new orders. Placing an order decrements that quantity.
 
 ## Checkout
 

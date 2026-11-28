@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { orderMessage, shippingBlurb, whatsappHref } from "@/lib/checkout";
+import { customerStatusLabel } from "@/lib/fulfillment";
 import { downloadInvoice, refreshOrder, resumePayment } from "@/lib/orders.functions";
 import type { PublicOrder } from "@/lib/order-types";
 import { paymentMethodLabel } from "@/lib/invoice-view";
@@ -52,7 +53,13 @@ export function OrderPanel({
       window.clearInterval(timer);
       socket?.close();
     };
-  }, [current.code, current.phone, current.status, current.paymentMethod, current.fonepaySocketUrl]);
+  }, [
+    current.code,
+    current.phone,
+    current.status,
+    current.paymentMethod,
+    current.fonepaySocketUrl,
+  ]);
 
   async function refresh() {
     setBusy(true);
@@ -92,18 +99,13 @@ export function OrderPanel({
     savePdf(result.filename, result.base64);
   }
 
-  const statusLabel =
-    current.status === "paid"
-      ? "Paid"
-      : current.status === "cod_confirmed"
-        ? "Confirmed for delivery"
-        : current.status === "pending_payment"
-          ? "Waiting for payment"
-          : current.status;
+  const statusLabel = customerStatusLabel(current.status, current.fulfillment);
 
   return (
     <div className="mt-8 grid gap-6">
-      {error ? <p className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm">{error}</p> : null}
+      {error ? (
+        <p className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm">{error}</p>
+      ) : null}
       <div className="rounded-2xl border border-line bg-surface p-5">
         <p className="text-xs uppercase tracking-[0.18em] text-copper">{current.code}</p>
         <h2 className="mt-2 font-display text-4xl tracking-wide">{statusLabel}</h2>
@@ -125,7 +127,9 @@ export function OrderPanel({
                 {line.qty} × {formatNprFromPaisa(line.unitPaisa)}
               </p>
             </div>
-            <p className="tabular-nums sm:text-right">{formatNprFromPaisa(line.unitPaisa * line.qty)}</p>
+            <p className="tabular-nums sm:text-right">
+              {formatNprFromPaisa(line.unitPaisa * line.qty)}
+            </p>
           </li>
         ))}
       </ul>
@@ -154,21 +158,39 @@ export function OrderPanel({
       {current.fonepayQrSvg && current.status === "pending_payment" ? (
         <div className="rounded-2xl border border-line bg-white p-4 text-neutral-900">
           <p className="text-sm font-medium">Scan with any Fonepay app</p>
-          <div className="mt-3 max-w-[280px]" dangerouslySetInnerHTML={{ __html: current.fonepayQrSvg }} />
+          <div
+            className="mt-3 max-w-[280px]"
+            dangerouslySetInnerHTML={{ __html: current.fonepayQrSvg }}
+          />
         </div>
       ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {current.invoice ? (
-          <button type="button" disabled={busy} onClick={() => void download()} className="h-12 rounded-full bg-copper px-5 text-sm font-medium text-bg">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void download()}
+            className="h-12 rounded-full bg-copper px-5 text-sm font-medium text-bg"
+          >
             {current.invoice.kind === "tax" ? "Download tax invoice" : "Download proforma"}
           </button>
         ) : null}
         {current.status === "pending_payment" ? (
           <>
-            <button type="button" disabled={busy} onClick={() => void refresh()} className="h-12 rounded-full border border-line px-5 text-sm">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void refresh()}
+              className="h-12 rounded-full border border-line px-5 text-sm"
+            >
               {busy ? "Checking…" : "I've paid — check status"}
             </button>
-            <button type="button" disabled={busy} onClick={() => void restart()} className="h-12 rounded-full border border-line px-5 text-sm">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void restart()}
+              className="h-12 rounded-full border border-line px-5 text-sm"
+            >
               Restart payment
             </button>
           </>

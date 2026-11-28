@@ -4,7 +4,8 @@ import { useState } from "react";
 import { JsonLd } from "@/components/json-ld";
 import { PartCard } from "@/components/part-card";
 import { categories, parts, vehicles } from "@/lib/catalog";
-import { abs, SITE } from "@/lib/site";
+import { homeJsonLd } from "@/lib/seo";
+import { abs } from "@/lib/site";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -13,7 +14,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Order exact-fit motorcycle and car parts in Nepal. Pulsar, Shine, Alto, i10. Same-day delivery in Kathmandu Valley from BAATO.",
+          "Order exact-fit motorcycle and car parts in Nepal. Pulsar, Apache, FZ, Dio, Classic 350, Scorpio, Swift, Creta, Hilux. Same-day delivery in Kathmandu Valley from BAATO.",
       },
       { name: "robots", content: "index,follow" },
     ],
@@ -44,45 +45,7 @@ function Home() {
 
   return (
     <main>
-      <JsonLd
-        data={{
-          "@context": "https://schema.org",
-          "@graph": [
-            {
-              "@type": "AutoPartsStore",
-              name: SITE.legal,
-              url: SITE.url,
-              description: SITE.description,
-              telephone: SITE.phone,
-              email: SITE.email,
-              address: {
-                "@type": "PostalAddress",
-                addressLocality: "Kathmandu",
-                addressCountry: "NP",
-              },
-              areaServed: "Nepal",
-            },
-            {
-              "@type": "WebSite",
-              name: SITE.name,
-              url: SITE.url,
-              potentialAction: {
-                "@type": "SearchAction",
-                target: `${SITE.url}/parts?q={search_term_string}`,
-                "query-input": "required name=search_term_string",
-              },
-            },
-            {
-              "@type": "FAQPage",
-              mainEntity: faqs.map((f) => ({
-                "@type": "Question",
-                name: f.q,
-                acceptedAnswer: { "@type": "Answer", text: f.a },
-              })),
-            },
-          ],
-        }}
-      />
+      <JsonLd data={homeJsonLd(faqs)} />
       <section className="relative">
         <img
           src="/media/hero.jpg"
@@ -98,7 +61,8 @@ function Home() {
             The part that gets the vehicle moving today.
           </h1>
           <p className="mt-4 max-w-lg text-base text-fg/90">
-            BAATO lists only high-failure motorcycle and car parts, matched to the models that actually fill Nepali roads. Downtime is the cost. Speed and fitment are the product.
+            BAATO lists only high-failure motorcycle and car parts, matched to the models that
+            actually fill Nepali roads. Downtime is the cost. Speed and fitment are the product.
           </p>
           <form
             className="mt-6 flex max-w-xl flex-col gap-2 sm:flex-row"
@@ -134,9 +98,21 @@ function Home() {
 
       <section className="mx-auto grid max-w-6xl gap-px bg-line px-4 py-px sm:grid-cols-3">
         {[
-          { icon: Clock3, t: "Same-day Valley", d: "In-stock orders placed before 14:00 leave the desk the same afternoon." },
-          { icon: ShieldCheck, t: "Named fitment", d: "Pitch, thread, pad plate, and engine family are on the page — not in a chat." },
-          { icon: Wrench, t: "Workshop reorder", d: "Garages buy the same SKU twice. That is how we decide what to keep deep." },
+          {
+            icon: Clock3,
+            t: "Same-day Valley",
+            d: "In-stock orders placed before 14:00 leave the desk the same afternoon.",
+          },
+          {
+            icon: ShieldCheck,
+            t: "Named fitment",
+            d: "Pitch, thread, pad plate, and engine family are on the page — not in a chat.",
+          },
+          {
+            icon: Wrench,
+            t: "Workshop reorder",
+            d: "Garages buy the same SKU twice. That is how we decide what to keep deep.",
+          },
         ].map((item) => (
           <div key={item.t} className="bg-bg px-2 py-8 sm:px-6">
             <item.icon className="size-5 text-copper" />
@@ -174,7 +150,8 @@ function Home() {
       <section className="mx-auto max-w-6xl px-4">
         <h2 className="font-display text-4xl tracking-wide">Moving this week</h2>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          These SKUs cover the failures we see first: chains, front brakes, filters, and batteries on Pulsar, Shine, Alto, and i10.
+          Chains, brakes, filters, and batteries for the bikes and cars that actually fill Nepali
+          roads — Pulsar, Apache, Shine, Classic 350, Alto, Swift, Scorpio, Hilux.
         </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {featured.map((p) => (
@@ -194,7 +171,9 @@ function Home() {
                 className="flex items-center justify-between rounded-2xl border border-line bg-surface px-4 py-4 hover:border-copper"
               >
                 <span>
-                  <span className="block text-xs uppercase tracking-[0.16em] text-muted">{v.kind}</span>
+                  <span className="block text-xs uppercase tracking-[0.16em] text-muted">
+                    {v.kind}
+                  </span>
                   <span className="font-display text-2xl tracking-wide">{v.name}</span>
                 </span>
                 <ArrowRight className="size-4 text-copper" />

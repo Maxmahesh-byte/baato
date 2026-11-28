@@ -1,3 +1,5 @@
+import { nepalParts, nepalVehicles } from "./catalog-nepal.ts";
+
 export type Quality = "Road Spec" | "Workshop Spec";
 
 export type Part = {
@@ -126,6 +128,7 @@ export const vehicles: Vehicle[] = [
       "Rear shoes and front pads are separate SKUs.",
     ],
   },
+  ...nepalVehicles,
 ];
 
 export const parts: Part[] = [
@@ -378,7 +381,16 @@ export const parts: Part[] = [
     sku: "BT-EL-H4",
     name: "H4 LED headlamp pair",
     category: "electrical",
-    vehicles: ["bajaj-pulsar-150", "bajaj-pulsar-ns200", "honda-shine"],
+    vehicles: [
+      "bajaj-pulsar-150",
+      "bajaj-pulsar-220f",
+      "bajaj-pulsar-ns200",
+      "tvs-apache-rtr-160",
+      "tvs-apache-rtr-200",
+      "yamaha-fz",
+      "honda-shine",
+      "honda-xr150l",
+    ],
     price: 1890,
     stock: 48,
     quality: "Road Spec",
@@ -411,6 +423,7 @@ export const parts: Part[] = [
     ],
     eta: "Same day, Valley — heavy item, rider dispatch",
   },
+  ...nepalParts,
 ];
 
 export function categoryBySlug(slug: string) {
