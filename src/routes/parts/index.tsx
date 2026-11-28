@@ -6,6 +6,7 @@ import { catalogHeading, partHaystack } from "@/lib/checkout";
 import { withSellableStock } from "@/lib/inventory";
 import { getPublicStock } from "@/lib/orders.functions";
 import { breadcrumbNode } from "@/lib/seo";
+import { indexablePartTypes } from "@/lib/part-types";
 import { abs } from "@/lib/site";
 
 type PartSearch = { q?: string; vehicle?: string; cat?: string };
@@ -136,6 +137,22 @@ function Catalog() {
           ))}
         </div>
       )}
+      <section className="mt-14">
+        <h2 className="font-display text-3xl tracking-wide">Part prices in Nepal</h2>
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {indexablePartTypes().map((t) => (
+            <li key={t.slug}>
+              <Link
+                to="/parts/$slug"
+                params={{ slug: t.slug }}
+                className="inline-flex rounded-full border border-line px-3 py-2 text-sm hover:border-copper"
+              >
+                {t.name} price in Nepal
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
     </main>
   );
 }
