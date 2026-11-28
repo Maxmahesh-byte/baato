@@ -1,5 +1,6 @@
-import { categories, parts, vehicles, type Part } from "./catalog.ts";
+import { categories, indexableVehicles, parts, type Part } from "./catalog.ts";
 import { abs, SITE } from "./site.ts";
+import { indexablePartTypes, type PartType } from "./part-types.ts";
 
 export type Crumb = { name: string; path: string };
 
@@ -68,6 +69,40 @@ export function productPageJsonLd(part: Part) {
   };
 }
 
+export function partTypeJsonLd(type: PartType, items: Part[]) {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      breadcrumbNode([
+        { name: "Home", path: "/" },
+        { name: "Catalog", path: "/parts" },
+        { name: `${type.name} price in Nepal`, path: `/parts/${type.slug}` },
+      ]),
+      ...(items.length
+        ? [
+            {
+              "@type": "ItemList",
+              name: `${type.name} price in Nepal`,
+              itemListElement: items.map((part, index) => ({
+                "@type": "ListItem",
+                position: index + 1,
+                item: productNode(part),
+              })),
+            },
+          ]
+        : []),
+      {
+        "@type": "FAQPage",
+        mainEntity: type.faq.map((faq) => ({
+          "@type": "Question",
+          name: faq.q,
+          acceptedAnswer: { "@type": "Answer", text: faq.a },
+        })),
+      },
+    ],
+  };
+}
+
 export function homeJsonLd(faqs: { q: string; a: string }[]) {
   return {
     "@context": "https://schema.org",
@@ -104,8 +139,9 @@ export function indexablePaths(): string[] {
     "/contact",
     "/orders/lookup",
     ...categories.map((category) => `/category/${category.slug}`),
-    ...vehicles.map((vehicle) => `/vehicles/${vehicle.slug}`),
+    ...indexableVehicles().map((vehicle) => `/vehicles/${vehicle.slug}`),
     ...parts.map((part) => `/parts/${part.slug}`),
+    ...indexablePartTypes().map((type) => `/parts/${type.slug}`),
   ];
 }
 
