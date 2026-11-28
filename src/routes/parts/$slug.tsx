@@ -7,18 +7,50 @@ import { useCart } from "@/lib/cart";
 import { withSellableStock } from "@/lib/inventory";
 import { getPublicStock, getShopConfig } from "@/lib/orders.functions";
 import { productPageJsonLd } from "@/lib/seo";
+import { PartTypePage } from "@/components/part-type-page";
+import { partsOfType, partTypeBySlug, priceRange } from "@/lib/part-types";
 import { abs } from "@/lib/site";
 import { npr } from "@/lib/utils";
 import { useState } from "react";
 
 export const Route = createFileRoute("/parts/$slug")({
   loader: async ({ params }) => {
+    const type = partTypeBySlug(params.slug);
+    if (type) {
+      const [config, stock] = await Promise.all([getShopConfig(), getPublicStock()]);
+      const items = partsOfType(type).map((p) => withSellableStock(p, stock[p.slug]));
+      return { view: "type" as const, typeSlug: type.slug, items, config, part: undefined };
+    }
     const found = partBySlug(params.slug);
     if (!found) throw notFound();
     const [config, stock] = await Promise.all([getShopConfig(), getPublicStock()]);
-    return { part: withSellableStock(found, stock[found.slug]), config };
+    return {
+      view: "part" as const,
+      part: withSellableStock(found, stock[found.slug]),
+      config,
+      items: [],
+    };
   },
   head: ({ loaderData }) => {
+    if (loaderData?.view === "type") {
+      const type = partTypeBySlug(loaderData.typeSlug);
+      if (!type) return { meta: [{ title: "BAATO" }] };
+      const range = priceRange(loaderData.items);
+      const priceText = range
+        ? range.low === range.high
+          ? ` — ${npr(range.low)}`
+          : ` — ${npr(range.low)} to ${npr(range.high)}`
+        : "";
+      return {
+        meta: [
+          { title: `${type.name} price in Nepal${priceText} | BAATO` },
+          { name: "description", content: type.intro },
+          // Guide-only pages (no SKUs yet) stay out of the index until stock exists.
+          { name: "robots", content: loaderData.items.length ? "index,follow" : "noindex,follow" },
+        ],
+        links: [{ rel: "canonical", href: abs(`/parts/${type.slug}`) }],
+      };
+    }
     const part = loaderData?.part;
     if (!part) return { meta: [{ title: "Part not found — BAATO" }] };
     return {
@@ -38,11 +70,27 @@ export const Route = createFileRoute("/parts/$slug")({
       </Link>
     </main>
   ),
-  component: Product,
+  component: PartsSlugPage,
 });
 
+function PartsSlugPage() {
+  const data = Route.useLoaderData();
+  if (data.view === "type") {
+    return (
+      <PartTypePage
+        typeSlug={data.typeSlug}
+        items={data.items}
+        whatsappE164={data.config.whatsappE164}
+      />
+    );
+  }
+  return <Product />;
+}
+
 function Product() {
-  const { part, config } = Route.useLoaderData();
+  const data = Route.useLoaderData();
+  const { config } = data;
+  const part = data.part!;
   const add = useCart((s) => s.add);
   const inCart = useCart((s) => s.lines.find((line) => line.slug === part.slug)?.qty ?? 0);
   const [added, setAdded] = useState(false);

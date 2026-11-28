@@ -1,4 +1,5 @@
 import { nepalParts, nepalVehicles } from "./catalog-nepal.ts";
+import { moreNepalVehicles } from "./catalog-nepal-more.ts";
 
 export type Quality = "Road Spec" | "Workshop Spec";
 
@@ -29,7 +30,9 @@ export type Category = {
 export type Vehicle = {
   slug: string;
   name: string;
-  kind: "Motorcycle" | "Car";
+  kind: "Motorcycle" | "Scooter" | "Car" | "Jeep";
+  /** Battery-electric vehicle: no engine oil, oil filter or clutch. */
+  ev?: boolean;
   image: string;
   intro: string;
   notes: string[];
@@ -129,6 +132,7 @@ export const vehicles: Vehicle[] = [
     ],
   },
   ...nepalVehicles,
+  ...moreNepalVehicles,
 ];
 
 export const parts: Part[] = [
@@ -448,4 +452,26 @@ export function partsForVehicle(slug: string) {
 
 export function vehicleName(slug: string) {
   return vehicles.find((v) => v.slug === slug)?.name ?? slug;
+}
+
+const KIND_PLURAL: Record<Vehicle["kind"], string> = {
+  Motorcycle: "bikes",
+  Scooter: "scooters",
+  Car: "cars",
+  Jeep: "jeeps",
+};
+
+export function kindPlural(kind: Vehicle["kind"]) {
+  return KIND_PLURAL[kind];
+}
+
+/** Vehicles with enough SKUs (2+) to deserve an indexed fitment page. */
+export const MIN_PARTS_FOR_INDEX = 2;
+
+export function vehicleIsIndexable(slug: string) {
+  return partsForVehicle(slug).length >= MIN_PARTS_FOR_INDEX;
+}
+
+export function indexableVehicles() {
+  return vehicles.filter((v) => vehicleIsIndexable(v.slug));
 }

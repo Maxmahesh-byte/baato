@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { partBySlug, parts, vehicles } from "./catalog.ts";
-import { organizationNode, productPageJsonLd, ROBOTS_TXT, sitemapXml } from "./seo.ts";
+import { indexableVehicles, partBySlug, parts, vehicles } from "./catalog.ts";
+import {
+  organizationNode,
+  partTypeJsonLd,
+  productPageJsonLd,
+  ROBOTS_TXT,
+  sitemapXml,
+} from "./seo.ts";
+import { indexablePartTypes, partsOfType, partTypeBySlug, partTypes } from "./part-types.ts";
 
 describe("JSON-LD", () => {
   it("describes BAATO as an organization and an auto parts store", () => {
@@ -51,10 +58,14 @@ describe("JSON-LD", () => {
 });
 
 describe("sitemap and robots", () => {
-  it("lists every vehicle and product and leaves the desk and API out", () => {
+  it("lists every stocked vehicle and product and leaves the desk and API out", () => {
     const xml = sitemapXml();
     assert.equal(readFileSync(new URL("../../public/sitemap.xml", import.meta.url), "utf8"), xml);
-    for (const vehicle of vehicles) assert.match(xml, new RegExp(`/vehicles/${vehicle.slug}<`));
+    for (const vehicle of indexableVehicles())
+      assert.match(xml, new RegExp(`/vehicles/${vehicle.slug}<`));
+    // Fitment-only vehicles (no stock yet) are not advertised to crawlers.
+    for (const vehicle of vehicles.filter((v) => !indexableVehicles().includes(v)))
+      assert.equal(xml.includes(`/vehicles/${vehicle.slug}<`), false, vehicle.slug);
     for (const part of parts) assert.match(xml, new RegExp(`/parts/${part.slug}<`));
     assert.equal(xml.includes("/admin"), false);
     assert.equal(xml.includes("/api"), false);
@@ -71,7 +82,52 @@ describe("sitemap and robots", () => {
 });
 
 function partsForEveryVehicle(): boolean {
-  return vehicles.every(
+  return indexableVehicles().every(
     (vehicle) => parts.filter((part) => part.vehicles.includes(vehicle.slug)).length >= 2,
   );
 }
+
+describe("part-type price pages", () => {
+  it("never collide with a part slug", () => {
+    for (const type of partTypes) assert.equal(partBySlug(type.slug), undefined, type.slug);
+  });
+
+  it("show NPR Product offers only for catalog SKUs, plus FAQ and breadcrumbs", () => {
+    const type = partTypeBySlug("brake-pads-price-in-nepal");
+    assert.ok(type);
+    const items = partsOfType(type);
+    assert.ok(items.length > 0);
+    const data = partTypeJsonLd(type, items);
+    const list = data["@graph"].find((node) => node["@type"] === "ItemList") as
+      | { itemListElement: { item: { offers: { priceCurrency: string; price: number } } }[] }
+      | undefined;
+    assert.ok(list);
+    assert.equal(list.itemListElement.length, items.length);
+    for (const entry of list.itemListElement) assert.equal(entry.item.offers.priceCurrency, "NPR");
+    assert.ok(data["@graph"].some((node) => node["@type"] === "FAQPage"));
+    assert.ok(data["@graph"].some((node) => node["@type"] === "BreadcrumbList"));
+  });
+
+  it("keeps price-less guide pages out of the sitemap and structured offers", () => {
+    const xml = sitemapXml();
+    for (const type of partTypes) {
+      const has = partsOfType(type).length > 0;
+      assert.equal(xml.includes(`/parts/${type.slug}<`), has, type.slug);
+      if (!has) {
+        const data = partTypeJsonLd(type, []);
+        assert.equal(
+          data["@graph"].some((node) => node["@type"] === "ItemList"),
+          false,
+        );
+      }
+    }
+    assert.ok(indexablePartTypes().length >= 5);
+  });
+
+  it("lists every vehicle, including EVs, with a known kind", () => {
+    const kinds = new Set(["Motorcycle", "Scooter", "Car", "Jeep"]);
+    for (const vehicle of vehicles) assert.ok(kinds.has(vehicle.kind), vehicle.slug);
+    assert.ok(vehicles.some((v) => v.slug === "byd-atto-3" && v.ev));
+    assert.equal(new Set(vehicles.map((v) => v.slug)).size, vehicles.length);
+  });
+});
